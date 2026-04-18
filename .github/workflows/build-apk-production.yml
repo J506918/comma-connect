@@ -24,7 +24,8 @@ jobs:
 
       - name: Setup pnpm
         run: |
-          corepack enable pnpm
+          npm install -g pnpm
+          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
           pnpm --version
 
       - name: Install dependencies
