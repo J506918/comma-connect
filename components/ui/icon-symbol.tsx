@@ -19,6 +19,17 @@ const MAPPING: IconMapping = {
   "info": "info",
   "error": "error",
   "warning": "warning",
+  "trash": "delete",
+  "arrow.down.doc": "file-download",
+  "wifi.slash": "wifi-off",
+  "stop.fill": "stop",
+  "play.fill": "play-arrow",
+  "sparkles": "auto-awesome",
+  "exclamationmark.circle": "error-outline",
+  "magnifyingglass": "search",
+  "bolt": "bolt",
+  "pencil": "edit",
+  "arrow.right": "arrow-forward",
 
   // Device / Connection
   "temperature": "thermostat",
@@ -65,6 +76,10 @@ const MAPPING: IconMapping = {
   "play": "play-arrow",
   "stop": "stop",
   "filter": "filter-list",
+  "wifi.slash": "wifi-off",
+  "trash": "delete",
+  "arrow.down.doc": "file-download",
+  "sparkles": "auto-awesome",
 
   // CAN
   "can": "settings-ethernet",
@@ -73,6 +88,11 @@ const MAPPING: IconMapping = {
   // AI
   "ai": "auto-awesome",
   "analyze": "analytics",
+  "sparkles": "auto-awesome",
+  "exclamationmark.circle": "error-outline",
+  "magnifyingglass": "search",
+  "bolt": "bolt",
+  "pencil": "edit",
 
   // Settings
   "settings": "settings",
