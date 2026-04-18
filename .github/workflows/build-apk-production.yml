@@ -22,11 +22,10 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Install pnpm
-        run: npm install -g pnpm
-        
-      - name: Verify pnpm installation
-        run: pnpm --version
+      - name: Setup pnpm
+        run: |
+          corepack enable pnpm
+          pnpm --version
 
       - name: Install dependencies
         run: pnpm install
