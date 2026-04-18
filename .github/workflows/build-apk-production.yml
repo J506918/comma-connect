@@ -24,12 +24,19 @@ jobs:
 
       - name: Setup pnpm
         run: |
+          echo "Current PATH: $PATH"
+          echo "npm prefix: $(npm config get prefix)"
           npm install -g pnpm
+          echo "pnpm installed, adding to PATH"
           echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
+          echo "Updated PATH: $PATH"
           pnpm --version
+          echo "pnpm setup complete"
 
       - name: Install dependencies
-        run: pnpm install
+        run: |
+          echo "Running pnpm install"
+          pnpm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
