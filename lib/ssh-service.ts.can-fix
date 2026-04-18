@@ -1,0 +1,139 @@
+  // ─── CAN Data Capture (using openpilot dump.py) ────────────────────────────
+  // 修复：只显示真实车辆数据，未连接车辆时显示 0
+
+  async startCanCapture(
+    onMessage: (msg: CanMessage) => void,
+    onError?: (err: string) => void
+  ): Promise<() => void> {
+    if (!this.connected || !this.client) {
+      throw new Error('未连接设备');
+    }
+
+    let running = true;
+    let messageCount = 0;
+    let noDataCount = 0; // 追踪连续无数据次数
+
+    const poll = async () => {
+      while (running && this.connected) {
+        try {
+          // Try multiple CAN capture methods (only real data)
+          let output = '';
+          let hasRealData = false;
+
+          try {
+            // Method 1: openpilot dump.py
+            output = await this.exec(
+              `timeout 1 python3 /data/openpilot/selfdrive/debug/dump.py can 2>/dev/null | head -30`
+            );
+            if (output && output.trim() && !output.includes('NO_CAN') && !output.includes('error') && !output.includes('Error')) {
+              hasRealData = true;
+            }
+          } catch (e) {
+            // Method 2: candump
+            try {
+              output = await this.exec(`timeout 0.5 candump -n 20 any 2>/dev/null`);
+              if (output && output.trim() && !output.includes('NO_CAN') && !output.includes('error')) {
+                hasRealData = true;
+              }
+            } catch (e2) {
+              // Method 3: check if CAN interface exists
+              try {
+                const canCheck = await this.exec(
+                  `ip link show | grep -q 'can[0-9]' && echo "CAN_EXISTS" || echo "NO_CAN"`
+                );
+                if (canCheck.includes('CAN_EXISTS')) {
+                  // CAN interface exists but no data flowing
+                  hasRealData = false;
+                } else {
+                  hasRealData = false;
+                }
+              } catch (e3) {
+                hasRealData = false;
+              }
+            }
+          }
+
+          // If we have real data, parse and send it
+          if (hasRealData && output && output.trim()) {
+            noDataCount = 0; // Reset counter
+            const lines = output.split('\n').filter(Boolean);
+            lines.forEach((line, idx) => {
+              // candump format: interface ID#DATA
+              const candumpMatch = line.match(/^\s*(\S+)\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]*)/);
+              // Generic hex format: channel 0xID data
+              const hexMatch = line.match(/^(\S+)\s+(0x[0-9A-Fa-f]+)\s+([0-9A-Fa-f]*)/);
+              // dump.py cereal format: parse address and data from cereal output
+              const cerealMatch = line.match(/address:\s*(\d+).*dat:\s*["']([0-9A-Fa-f]+)/i);
+              // Simple numeric format: ID DATA
+              const simpleMatch = line.match(/^\s*(\d+)\s+([0-9A-Fa-f]+)\s*$/);
+
+              if (candumpMatch) {
+                onMessage({
+                  channel: candumpMatch[1],
+                  id: candumpMatch[2].toUpperCase(),
+                  data: candumpMatch[3].toUpperCase(),
+                  dlc: Math.floor(candumpMatch[3].length / 2),
+                  timestamp: Date.now() + idx,
+                });
+              } else if (hexMatch) {
+                onMessage({
+                  channel: hexMatch[1],
+                  id: hexMatch[2].replace('0x', '').toUpperCase(),
+                  data: hexMatch[3].toUpperCase(),
+                  dlc: Math.floor(hexMatch[3].length / 2),
+                  timestamp: Date.now() + idx,
+                });
+              } else if (cerealMatch) {
+                const decId = parseInt(cerealMatch[1], 10);
+                onMessage({
+                  channel: 'can0',
+                  id: decId.toString(16).toUpperCase(),
+                  data: cerealMatch[2].toUpperCase(),
+                  dlc: Math.floor(cerealMatch[2].length / 2),
+                  timestamp: Date.now() + idx,
+                });
+              } else if (simpleMatch) {
+                const decId = parseInt(simpleMatch[1], 10);
+                onMessage({
+                  channel: 'can0',
+                  id: decId.toString(16).toUpperCase(),
+                  data: simpleMatch[2].toUpperCase(),
+                  dlc: Math.floor(simpleMatch[2].length / 2),
+                  timestamp: Date.now() + idx,
+                });
+              }
+            });
+          } else {
+            // No real data - show 0 or nothing
+            noDataCount++;
+            if (noDataCount === 1) {
+              // Only report once when we first detect no data
+              onMessage({
+                channel: 'can0',
+                id: '0',
+                data: '00',
+                dlc: 1,
+                timestamp: Date.now(),
+              });
+            }
+          }
+        } catch (err: any) {
+          if (running) {
+            onError?.(err.message);
+            // Send 0 on error
+            onMessage({
+              channel: 'can0',
+              id: '0',
+              data: '00',
+              dlc: 1,
+              timestamp: Date.now(),
+            });
+          }
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Poll every 1 second
+      }
+    };
+
+    poll();
+    return () => { running = false; };
+  }
